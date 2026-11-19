@@ -1,0 +1,136 @@
+# LEARMS linux_operations.log - real terminal session, 2026-11-19 14:14 EET
+# Environment: Ubuntu 24.04.5 LTS, run as: root. Replay the commands in this order.
+# NOTE 1: this sandbox has no open internet, so apt-get cannot reach the Ubuntu mirrors; on a normal WSL/Ubuntu machine the same two apt-get commands install sqlite3.
+# NOTE 2: a first deployment attempt showed that an empty logs/ folder is not tracked by Git; the app then fell back to console logging (try/except worked). Fixed by committing logs/.gitkeep, and this log is the clean re-run.
+
+$ timeout 25 apt-get update 2>&1 | tail -3
+Ign:1 http://archive.ubuntu.com/ubuntu noble InRelease
+Ign:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Ign:3 http://archive.ubuntu.com/ubuntu noble-updates InRelease
+[exit 0]
+
+$ timeout 25 apt-get install -y sqlite3 2>&1 | tail -2
+Reading state information...
+E: Unable to locate package sqlite3
+[exit 0]
+
+$ which sqlite3 || echo 'sqlite3 CLI not available here; the built-in python3 sqlite3 module is used instead'
+sqlite3 CLI not available here; the built-in python3 sqlite3 module is used instead
+[exit 0]
+
+$ python3 -c 'import sqlite3; print("python sqlite3 module, SQLite", sqlite3.sqlite_version)'
+python sqlite3 module, SQLite 3.53.1
+[exit 0]
+
+$ rm -rf /opt/learms; userdel -r learms_svc 2>/dev/null; groupdel learms 2>/dev/null; echo clean-start
+clean-start
+[exit 0]
+
+$ groupadd learms
+[exit 0]
+
+$ useradd -m -s /bin/bash -g learms learms_svc
+[exit 0]
+
+$ id learms_svc
+uid=30033(learms_svc) gid=30002(learms) groups=30002(learms)
+[exit 0]
+
+$ git clone -q /home/claude/work/g/LEARMS /opt/learms && ls -la /opt/learms
+total 28
+drwxr-xr-x  7 root root 4096 Nov 19 14:14 .
+drwxr-xr-x 27 root root 4096 Nov 19 14:14 ..
+drwxr-xr-x  8 root root 4096 Nov 19 14:14 .git
+drwxr-xr-x  2 root root 4096 Nov 19 14:14 code
+drwxr-xr-x  2 root root 4096 Nov 19 14:14 data
+drwxr-xr-x  2 root root 4096 Nov 19 14:14 docs
+drwxr-xr-x  2 root root 4096 Nov 19 14:14 logs
+[exit 0]
+
+$ chown -R root:learms /opt/learms
+[exit 0]
+
+$ chmod 750 /opt/learms /opt/learms/code
+[exit 0]
+
+$ chmod 770 /opt/learms/data /opt/learms/logs
+[exit 0]
+
+$ chmod 640 /opt/learms/code/*.py; chmod 660 /opt/learms/data/raw_cohort_data.csv
+[exit 0]
+
+$ ls -ld /opt/learms /opt/learms/code /opt/learms/data /opt/learms/logs
+drwxr-x--- 7 root learms 4096 Nov 19 14:14 /opt/learms
+drwxr-x--- 2 root learms 4096 Nov 19 14:14 /opt/learms/code
+drwxrwx--- 2 root learms 4096 Nov 19 14:14 /opt/learms/data
+drwxrwx--- 2 root learms 4096 Nov 19 14:14 /opt/learms/logs
+[exit 0]
+
+$ ls -l /opt/learms/code /opt/learms/data
+/opt/learms/code:
+total 12
+-rw-r----- 1 root learms 7014 Nov 19 14:14 main.py
+-rw-r----- 1 root learms 2843 Nov 19 14:14 models.py
+
+/opt/learms/data:
+total 4
+-rw-rw---- 1 root learms 2941 Nov 19 14:14 raw_cohort_data.csv
+[exit 0]
+
+$ (cd /opt/learms && runuser -u learms_svc -- sh -c "umask 027; python3 code/main.py --hold 12" > /tmp/learms_run.out 2>&1 &)
+
+$ ps aux | grep '[c]ode/main.py'
+root      1371  0.0  0.0   5852  3384 ?        S    14:14   0:00 runuser -u learms_svc -- sh -c umask 027; python3 code/main.py --hold 12
+learms_+  1373  0.0  0.0   2828  1972 ?        S    14:14   0:00 sh -c umask 027; python3 code/main.py --hold 12
+learms_+  1374  1.0  0.2  39576 17324 ?        S    14:14   0:00 python3 code/main.py --hold 12
+[exit 0]
+
+$ ps -o pid,user,%cpu,%mem,rss,stat,etime,cmd -u learms_svc | grep -E 'PID|main.py'
+  PID USER     %CPU %MEM   RSS STAT     ELAPSED CMD
+ 1373 learms_+  0.0  0.0  1972 S          00:03 sh -c umask 027; python3 code/main.py --hold 12
+ 1374 learms_+  1.0  0.2 17324 S          00:03 python3 code/main.py --hold 12
+[exit 0]
+
+$ cat /tmp/learms_run.out
+Parsed 45 learners, inserted 45, invalid rows 0
+Flagged for audit (every 10th): SP-L-1010, SP-L-1020, SP-L-1030, SP-L-1040
+Cohort summary (excluding Dropped learners):
+  AI & Machine Learning Cohort 2           learners=7   avg_score=86.86
+  Cloud Computing Cohort 3                 learners=7   avg_score=83.71
+  Cybersecurity Cohort 1                   learners=6   avg_score=90.04
+  Data Science Cohort 5                    learners=10  avg_score=81.55
+  Full Stack Web Development Cohort 8      learners=9   avg_score=86.31
+Polymorphism demo (same call, different output):
+  [Instructor] Dr. Laila Hassan <laila@instructors.sprints.example> | teaches: Data Science Cohort 5, AI & Machine Learning Cohort 2
+  [Learner] SP-L-1001 Ahmed Youssef | Data Science Cohort 5 | score=85.50 | Active | no audit
+  [Learner] SP-L-1002 Salma Tareq | Full Stack Web Development Cohort 8 | score=92.00 | Graduated | no audit
+  [Learner] SP-L-1010 Hadeer Mostafa | Cloud Computing Cohort 3 | score=76.25 | Active | AUDIT
+Holding process for 12s (pid 1374)...
+[exit 0]
+
+$ ls -l /opt/learms/data /opt/learms/logs
+/opt/learms/data:
+total 28
+-rw-rw---- 1 root       learms  2941 Nov 19 14:14 raw_cohort_data.csv
+-rw-r----- 1 learms_svc learms 24576 Nov 19 14:14 sprints_learners.db
+
+/opt/learms/logs:
+total 4
+-rw-r----- 1 learms_svc learms 243 Nov 19 14:14 application_activity.log
+[exit 0]
+
+$ runuser -u learms_svc -- python3 -c "import sqlite3;c=sqlite3.connect('/opt/learms/data/sprints_learners.db');print('learners',c.execute('select count(*) from Learners').fetchone()[0],'cohorts',c.execute('select count(*) from Cohorts').fetchone()[0],'audited',c.execute('select count(*) from Learners where audit_flag=1').fetchone()[0])"
+learners 45 cohorts 5 audited 4
+[exit 0]
+
+$ runuser -u nobody -- cat /opt/learms/data/sprints_learners.db >/dev/null && echo 'other users CAN read (bad)' || echo 'other users are denied (good)'
+cat: /opt/learms/data/sprints_learners.db: Permission denied
+other users are denied (good)
+[exit 0]
+
+$ cat /opt/learms/logs/application_activity.log
+2026-11-19 14:14:45,489 INFO LEARMS run started (pid=1374)
+2026-11-19 14:14:45,494 INFO Transaction summary: parsed=45 inserted=45 invalid_rows=0 audited=SP-L-1010,SP-L-1020,SP-L-1030,SP-L-1040
+2026-11-19 14:14:57,495 INFO LEARMS run finished
+[exit 0]
+
